@@ -1,0 +1,31 @@
+name: Bug report
+description: Something isn't working
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "**Never paste anything from `~/.config/whoop/`** (Client Secret, tokens)."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: fetch
+    attributes:
+      label: whoop-fetch output
+      description: 'Output of `~/.config/omarchy/plugins/ruffbudda.whoop/scripts/whoop-fetch; echo "exit $?"`'
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: Shell log
+      description: 'Relevant lines from `quickshell log --any-display -p /usr/share/omarchy/shell -t 80`'
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Plugin version (manifest.json), `omarchy version`, and your theme

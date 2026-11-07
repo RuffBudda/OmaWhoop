@@ -1,0 +1,55 @@
+#!/bin/bash
+# Local and CI checks for WHOOP Rings. Run from anywhere: tools/check
+# Mirrors `omarchy plugin validate` (manifest schema, entry points, no
+# symlinks) so it also runs on machines without Omarchy, then checks the
+# scripts, the colour tests and, when Qt's qmlformat is installed, QML syntax.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+fail() { echo "FAIL: $*" >&2; exit 1; }
+ok() { echo "ok - $*"; }
+
+# Manifest
+jq -e . manifest.json >/dev/null || fail "manifest.json is not valid JSON"
+jq -e '.schemaVersion == 1' manifest.json >/dev/null || fail "schemaVersion must be the number 1"
+for f in id name version kinds entryPoints; do
+  jq -e --arg f "$f" 'has($f)' manifest.json >/dev/null || fail "manifest missing '$f'"
+done
+id=$(jq -r .id manifest.json)
+[[ $id =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && $id != *..* && $id != omarchy.* ]] || fail "bad id '$id'"
+jq -e '(.kinds|type)=="array" and (.kinds|length)>0' manifest.json >/dev/null || fail "kinds must be a non-empty array"
+jq -e '(.kinds|index("service"))==null or (.entryPoints|has("service"))' manifest.json >/dev/null \
+  || fail "kind 'service' needs entryPoints.service"
+while IFS= read -r ep; do
+  [[ $ep != /* && $ep != *..* && -f $ep ]] || fail "bad entry point '$ep'"
+done < <(jq -r '.entryPoints[]' manifest.json)
+[[ -z $(find . -name .git -prune -o -type l -print -quit) ]] || fail "symlinks are not allowed in a plugin"
+ok "manifest ($id $(jq -r .version manifest.json))"
+
+# Scripts
+for s in scripts/*; do
+  [[ -x $s ]] || fail "$s is not executable"
+  python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' "$s" || fail "$s has a syntax error"
+done
+ok "scripts parse and are executable"
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+set +e; XDG_CONFIG_HOME="$tmp/config" XDG_CACHE_HOME="$tmp/cache" scripts/whoop-fetch; code=$?; set -e
+[[ $code == 2 ]] || fail "whoop-fetch should exit 2 when not connected (got $code)"
+ok "whoop-fetch exits 2 when WHOOP isn't connected"
+
+# Example settings
+jq -e . examples/widget.json >/dev/null || fail "examples/widget.json is not valid JSON"
+ok "examples/widget.json"
+
+# Colour logic
+node tests/colors.test.cjs >/dev/null || { node tests/colors.test.cjs; fail "colour tests"; }
+ok "colour tests"
+
+# QML syntax (optional)
+qmlformat=$(command -v qmlformat || command -v qmlformat6 || ls /usr/lib/qt6/bin/qmlformat 2>/dev/null || true)
+if [[ -n $qmlformat ]]; then
+  "$qmlformat" Service.qml >/dev/null || fail "Service.qml doesn't parse"
+  ok "Service.qml parses"
+else
+  echo "skip - qmlformat not installed (QML syntax not checked)"
+fi
+echo "All checks passed."

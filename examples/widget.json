@@ -1,0 +1,16 @@
+{
+  "corner": "top-left",
+  "offsetX": 0,
+  "offsetY": 0,
+  "screen": "",
+  "refreshMinutes": 15,
+  "recoveryZones": true,
+  "colors": {
+    "ring": "accent",
+    "value": "foreground",
+    "label": "muted",
+    "box": "background",
+    "boxOpacity": 0.35,
+    "trackOpacity": 0.15
+  }
+}

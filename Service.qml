@@ -3,14 +3,21 @@
 //
 // Data comes from scripts/whoop-fetch (bundled with this plugin), which writes
 // ~/.cache/whoop.json. The widget stays hidden until you connect WHOOP once
-// with scripts/whoop-auth. Optional placement: ~/.config/whoop/widget.json
-// (see README).
+// with scripts/whoop-auth. Optional placement and colours:
+// ~/.config/whoop/widget.json (see README).
+//
+// Colours come from the system theme. By default everything follows the
+// theme's accent and background and changes live on `omarchy theme set`. Any
+// setting can instead name another theme role ("foreground", "muted", ...),
+// any key of the active theme's colors.toml ("green", "bright_blue", ...) or a
+// hex value.
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
 import qs.Commons as Commons
+import "Colors.js" as Colors
 
 Item {
   id: root
@@ -29,6 +36,8 @@ Item {
   property int offsetY: 0              // extra px away from the top/bottom edge
   property string screenName: ""       // e.g. "DP-1"; empty = laptop panel, else first screen
   property int refreshMinutes: 15      // at least 5
+  property var colorSettings: ({})     // the "colors" object, see README
+  property bool recoveryZones: false   // colour recovery by WHOOP zone (theme green/yellow/red)
 
   // Spacing matches Omarchy's default window gaps (gaps_out 10 + 2 px border).
   readonly property int edgeGap: 12
@@ -46,6 +55,55 @@ Item {
     root.offsetY = Number.isFinite(s.offsetY) ? Math.round(s.offsetY) : 0
     root.screenName = typeof s.screen === "string" ? s.screen : ""
     root.refreshMinutes = Number.isFinite(s.refreshMinutes) ? Math.max(5, Math.round(s.refreshMinutes)) : 15
+    var c = s.colors
+    if (typeof c === "string") c = { ring: c }        // "colors": "green" is shorthand for every ring
+    root.colorSettings = (c && typeof c === "object") ? c : {}
+    root.recoveryZones = s.recoveryZones === true
+  }
+
+  // ---- Colours (from the system theme) -------------------------------------
+  // The active theme's full palette, from its colors.toml. Omarchy swaps the
+  // theme by relinking the folder, so it is re-read whenever the shell's own
+  // theme colours change, as well as when the file itself changes.
+  property var themePalette: ({})
+  FileView {
+    id: paletteFile
+    path: (Commons.Color.currentThemePath || (root.home + "/.local/state/omarchy/current/theme")) + "/colors.toml"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.themePalette = Colors.parsePalette(text())
+    onLoadFailed: root.themePalette = ({})
+  }
+  Connections {
+    target: Commons.Color
+    function onAccentChanged() { paletteFile.reload() }
+    function onForegroundChanged() { paletteFile.reload() }
+    function onBackgroundChanged() { paletteFile.reload() }
+  }
+
+  // Live theme roles; reading them here makes every binding below follow theme switches.
+  readonly property var roles: ({
+    accent: Commons.Color.accent, foreground: Commons.Color.foreground,
+    background: Commons.Color.background, muted: Commons.Color.muted, urgent: Commons.Color.urgent
+  })
+  function colorOf(key, fallback) {
+    return Colors.resolve(root.colorSettings[key], root.roles, root.themePalette, fallback)
+  }
+  function alphaOf(key, fallback) { return Colors.clamp01(root.colorSettings[key], fallback) }
+
+  readonly property color ringColor: colorOf("ring", Commons.Color.accent)
+  readonly property color valueColor: colorOf("value", ringColor)
+  readonly property color labelColor: colorOf("label", ringColor)
+  readonly property real trackOpacity: alphaOf("trackOpacity", 0.15)
+  readonly property color boxColor: colorOf("box", "#000000")
+  readonly property real boxOpacity: alphaOf("boxOpacity", 0.35)
+  readonly property color sleepColor: colorOf("sleep", ringColor)
+  readonly property color strainColor: colorOf("strain", ringColor)
+  readonly property color recoveryColor: {
+    if (root.colorSettings.recovery !== undefined) return colorOf("recovery", ringColor)
+    if (root.recoveryZones && ready && has(whoop.recovery)) return Colors.zoneColor(whoop.recovery, root.themePalette, ringColor)
+    return ringColor
   }
 
   FileView {
@@ -102,6 +160,9 @@ Item {
     property bool percent: true
     property bool hasValue: true
     property real size: 64
+    property color color: root.ringColor
+    property color valueColor: root.valueColor
+    property color labelColor: root.labelColor
     spacing: Math.round(size * 0.1)
 
     Item {
@@ -110,15 +171,17 @@ Item {
       Canvas {
         anchors.fill: parent
         property real f: ring.hasValue ? Math.max(0, Math.min(1, ring.fraction)) : 0
-        property color accent: Commons.Color.accent
+        property color accent: ring.color
+        property real trackAlpha: root.trackOpacity
         onFChanged: requestPaint()
         onAccentChanged: requestPaint()
+        onTrackAlphaChanged: requestPaint()
         onPaint: {
           var ctx = getContext("2d"); ctx.reset()
           var lw = Math.max(4, ring.size * 0.09)
           var c = width / 2, r = c - lw / 2 - 1, a = accent
           ctx.lineWidth = lw; ctx.lineCap = "round"
-          ctx.strokeStyle = Qt.rgba(a.r, a.g, a.b, 0.15)
+          ctx.strokeStyle = Qt.rgba(a.r, a.g, a.b, trackAlpha)
           ctx.beginPath(); ctx.arc(c, c, r, 0, 2 * Math.PI); ctx.stroke()
           if (f > 0) {
             ctx.strokeStyle = a
@@ -130,7 +193,7 @@ Item {
         anchors.centerIn: parent
         textFormat: Text.PlainText
         text: ring.hasValue ? (ring.percent ? Math.round(ring.value) + "%" : ring.value.toFixed(1)) : "–"
-        color: Commons.Color.accent
+        color: ring.valueColor
         font.family: Style.font.family
         font.pixelSize: Math.round(ring.size * 0.2)
         font.weight: Font.DemiBold
@@ -140,7 +203,7 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       textFormat: Text.PlainText
       text: ring.label
-      color: Commons.Color.accent
+      color: ring.labelColor
       font.family: Style.font.family
       font.pixelSize: 12
       font.letterSpacing: 1
@@ -177,7 +240,7 @@ Item {
       width: ringsRow.implicitWidth + 2 * root.pad
       height: root.boxHeight
       radius: Style.cornerRadius
-      color: Qt.rgba(0, 0, 0, 0.35)
+      color: Qt.rgba(root.boxColor.r, root.boxColor.g, root.boxColor.b, root.boxOpacity)
 
       Row {
         id: ringsRow
@@ -186,6 +249,7 @@ Item {
         Ring {
           size: root.ringSize
           label: "SLEEP"
+          color: root.sleepColor
           hasValue: root.ready && root.has(root.whoop.sleep)
           value: hasValue ? root.whoop.sleep : 0
           fraction: value / 100
@@ -193,6 +257,7 @@ Item {
         Ring {
           size: root.ringSize
           label: "RECOVERY"
+          color: root.recoveryColor
           hasValue: root.ready && root.has(root.whoop.recovery)
           value: hasValue ? root.whoop.recovery : 0
           fraction: value / 100
@@ -200,6 +265,7 @@ Item {
         Ring {
           size: root.ringSize
           label: "STRAIN"
+          color: root.strainColor
           percent: false
           hasValue: root.ready && root.has(root.whoop.strain)
           value: hasValue ? root.whoop.strain : 0

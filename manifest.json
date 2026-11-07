@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "ruffbudda.whoop",
   "name": "WHOOP Rings",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "RuffBudda",
   "license": "MIT",
-  "description": "Desktop widget: your WHOOP sleep, recovery and strain as rings on the wallpaper, in your theme's accent colour",
+  "description": "Desktop widget: your WHOOP sleep, recovery and strain as rings on the wallpaper, coloured from your system theme",
   "kinds": ["service"],
   "keepLoaded": true,
   "entryPoints": { "service": "Service.qml" }
