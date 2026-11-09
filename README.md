@@ -248,9 +248,9 @@ quickshell log --any-display -p /usr/share/omarchy/shell -t 80   # shell errors
 
 ## Development
 
+From a checkout of this repository:
+
 ```bash
-git clone https://github.com/RuffBudda/OmaWhoop.git
-cd OmaWhoop
 tools/check                                    # manifest, scripts, colour tests, QML syntax
 omarchy plugin validate .                      # Omarchy's own validator
 ln -s "$PWD" ~/.config/omarchy/plugins/ruffbudda.whoop && omarchy plugin enable ruffbudda.whoop
