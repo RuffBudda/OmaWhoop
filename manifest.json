@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "ruffbudda.whoop",
   "name": "WHOOP Rings",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "RuffBudda",
   "license": "MIT",
   "description": "Desktop widget: your WHOOP sleep, recovery and strain as rings on the wallpaper, coloured from your system theme",

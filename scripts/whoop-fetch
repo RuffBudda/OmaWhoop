@@ -72,7 +72,8 @@ def main():
         "updated": datetime.now(timezone.utc).isoformat(),
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT + ".tmp", "w") as f:
+    fd = os.open(OUT + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
         json.dump(data, f)
     os.replace(OUT + ".tmp", OUT)
     return 0

@@ -4,6 +4,13 @@ All notable changes to WHOOP Rings are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-11-13
+
+### Fixed
+- `scripts/whoop-fetch` now writes the cache file (`~/.cache/whoop.json`) with mode
+  600, preventing local disclosure of WHOOP health metrics on systems with permissive
+  umask.
+
 ## [1.1.0] - 2026-11-07
 
 ### Added
@@ -26,5 +33,6 @@ All notable changes to WHOOP Rings are listed here. The format follows
   data fetch), which run from the plugin folder.
 - Optional `~/.config/whoop/widget.json` for corner, offsets, screen and refresh interval.
 
+[1.1.1]: https://github.com/RuffBudda/OmaWhoop/releases/tag/v1.1.1
 [1.1.0]: https://github.com/RuffBudda/OmaWhoop/releases/tag/v1.1.0
 [1.0.0]: https://github.com/RuffBudda/OmaWhoop/releases/tag/v1.0.0
